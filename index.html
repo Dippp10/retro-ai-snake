@@ -1,1 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Retro AI Snake</title>
+
+<style>
+  body {
+    background: black;
+    color: #00ff00;
+    font-family: "Courier New", monospace;
+    text-align: center;
+  }
+
+  h1 {
+    margin-bottom: 10px;
+  }
+
+  canvas {
+    border: 4px solid #00ff00;
+    background: #111;
+  }
+
+  button {
+    margin-top: 10px;
+    background: black;
+    color: #00ff00;
+    border: 2px solid #00ff00;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+
+  p {
+    margin-top: 5px;
+  }
+</style>
+</head>
+
+<body>
+
+<h1>🐍 Retro AI Snake</h1>
+<canvas id="game" width="400" height="400"></canvas><br>
+<button id="toggleAI">Toggle AI</button>
+<p id="status">Mode: Manual</p>
+
+<script>
+/* =======================
+   GRID CONFIG
+======================= */
+const GRID_SIZE = 20;
+const CELL_SIZE = 20;
+
+function cellEquals(a, b) {
+  return a.x === b.x && a.y === b.y;
+}
+
+function inBounds(cell) {
+  return cell.x >= 0 && cell.y >= 0 &&
+         cell.x < GRID_SIZE && cell.y < GRID_SIZE;
+}
+
+/* =======================
+   SNAKE CLASS
+======================= */
+class Snake {
+  constructor() {
+    this.body = [{ x: 10, y: 10 }];
+    this.dir = { x: 1, y: 0 };
+  }
+
+  setDirection(d) {
+    this.dir = d;
+  }
+
+  move() {
+    const head = {
+      x: this.body[0].x + this.dir.x,
+      y: this.body[0].y + this.dir.y
+    };
+    this.body.unshift(head);
+    this.body.pop();
+  }
+
+  grow() {
+    this.body.push({ ...this.body[this.body.length - 1] });
+  }
+
+  hitsSelf() {
+    const [head, ...rest] = this.body;
+    return rest.some(p => cellEquals(p, head));
+  }
+}
+
+/* =======================
+   AI LOGIC (BFS)
+======================= */
+function bfs(start, goal, snakeBody) {
+  const queue = [];
+  const visited = new Set();
+  const parent = new Map();
+
+  queue.push(start);
+  visited.add(`${start.x},${start.y}`);
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+
+    if (cellEquals(current, goal)) {
+      const path = [];
+      let c = current;
+      while (c) {
+        path.push(c);
+        c = parent.get(`${c.x},${c.y}`);
+      }
+      return path.reverse();
+    }
+
+    const moves = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 }
+    ];
+
+    for (let m of moves) {
+      const next = { x: current.x + m.x, y: current.y + m.y };
+      const key = `${next.x},${next.y}`;
+
+      if (!inBounds(next)) continue;
+      if (snakeBody.some(p => cellEquals(p, next))) continue;
+      if (visited.has(key)) continue;
+
+      visited.add(key);
+      parent.set(key, current);
+      queue.push(next);
+    }
+  }
+  return null;
+}
+
+function aiNextMove(snake, food) {
+  const path = bfs(snake.body[0], food, snake.body);
+  if (!path || path.length < 2) return snake.dir;
+
+  const next = path[1];
+  return {
+    x: next.x - snake.body[0].x,
+    y: next.y - snake.body[0].y
+  };
+}
+
+/* =======================
+   GAME ENGINE
+======================= */
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const snake = new Snake();
+let food = randomFood();
+let useAI = false;
+
+document.getElementById("toggleAI").onclick = () => {
+  useAI = !useAI;
+  document.getElementById("status").innerText =
+    useAI ? "Mode: AI" : "Mode: Manual";
+};
+
+document.addEventListener("keydown", e => {
+  if (useAI) return;
+
+  const map = {
+    ArrowUp:    { x: 0, y: -1 },
+    ArrowDown:  { x: 0, y: 1 },
+    ArrowLeft:  { x: -1, y: 0 },
+    ArrowRight: { x: 1, y: 0 }
+  };
+  if (map[e.key]) snake.setDirection(map[e.key]);
+});
+
+function randomFood() {
+  return {
+    x: Math.floor(Math.random() * GRID_SIZE),
+    y: Math.floor(Math.random() * GRID_SIZE)
+  };
+}
+
+function drawCell(x, y, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(
+    x * CELL_SIZE,
+    y * CELL_SIZE,
+    CELL_SIZE,
+    CELL_SIZE
+  );
+}
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (useAI) {
+    snake.setDirection(aiNextMove(snake, food));
+  }
+
+  snake.move();
+
+  if (!inBounds(snake.body[0]) || snake.hitsSelf()) {
+    alert("Game Over");
+    location.reload();
+  }
+
+  if (cellEquals(snake.body[0], food)) {
+    snake.grow();
+    food = randomFood();
+  }
+
+  snake.body.forEach(p => drawCell(p.x, p.y, "#00ff00"));
+  drawCell(food.x, food.y, "red");
+
+  setTimeout(gameLoop, 120);
+}
+
+gameLoop();
+</script>
+
+</body>
+</html>
 
